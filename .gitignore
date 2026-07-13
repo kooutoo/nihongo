@@ -1,0 +1,7 @@
+.DS_Store
+**/.DS_Store
+
+data/N1/**/audio/*.mp3
+data/N1/**/audio/*.m4a
+data/N1/**/audio/*.wav
+data/N1/**/audio/*.aac

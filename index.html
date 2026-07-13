@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>日语专四语法高效复习系统</title>
+  <title>日语学习智能复习系统</title>
   <style>
     :root {
       --primary-color: #4a6741;
@@ -324,6 +324,125 @@
       color: #b45309;
     }
 
+    .n1-toolbar {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 10px;
+      margin-bottom: 18px;
+      align-items: center;
+    }
+
+    .n1-select {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text-color);
+      font-size: 15px;
+    }
+
+    .n1-section-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .n1-question-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      border-left: 5px solid var(--primary-color);
+    }
+
+    .n1-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      color: #666;
+      font-size: 14px;
+      flex-wrap: wrap;
+    }
+
+    .n1-section-title {
+      color: var(--primary-color);
+      font-weight: bold;
+      margin-bottom: 14px;
+    }
+
+    .n1-passage {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+      white-space: pre-wrap;
+      text-align: left;
+    }
+
+    .n1-question-title {
+      font-size: 19px;
+      font-weight: bold;
+      color: #1a1a1a;
+      margin-bottom: 16px;
+      white-space: pre-wrap;
+    }
+
+    .n1-media {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .n1-media img {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+    }
+
+    .n1-media audio {
+      width: 100%;
+    }
+
+    .is-hidden {
+      display: none;
+    }
+
+    .n1-answer {
+      display: none;
+      margin-top: 18px;
+      padding: 18px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border-top: 4px solid var(--primary-color);
+      white-space: pre-wrap;
+      text-align: left;
+    }
+
+    .n1-answer.show {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @media (max-width: 620px) {
+      .nav-tabs {
+        flex-wrap: wrap;
+      }
+
+      .n1-toolbar {
+        grid-template-columns: 1fr;
+      }
+
+      .quiz-stats,
+      .n1-meta {
+        flex-direction: column;
+      }
+    }
+
     .empty-tips {
       text-align: center;
       padding: 40px;
@@ -349,13 +468,14 @@
 
   <div class="container">
     <header>
-      <h1>专四语法智能复习系统</h1>
-      <p>包含多维度形似词干扰刷题与错题隔离复习</p>
+      <h1>日语学习智能复习系统</h1>
+      <p>包含语法复习、智能测试、错题隔离与N1真题练习</p>
     </header>
 
     <div class="nav-tabs">
       <button class="tab-btn active" data-tab="study">📖 语法浏览</button>
       <button class="tab-btn" data-tab="quiz">✍️ 智能测试</button>
+      <button class="tab-btn" data-tab="n1">📝 N1真题</button>
       <button class="tab-btn" data-tab="notebook">❌ 我的错题本 (<span id="notebook-count">0</span>)</button>
     </div>
 
@@ -400,6 +520,21 @@
       </div>
     </div>
 
+    <div id="n1-panel" class="panel">
+      <div class="n1-toolbar">
+        <select class="n1-select" id="n1-exam-select" aria-label="选择N1考试日期"></select>
+        <select class="n1-select" id="n1-mode-select" aria-label="选择练习模式">
+          <option value="sequential">顺序练习</option>
+          <option value="random">随机练习</option>
+        </select>
+        <button class="primary-btn" id="n1-start-btn">开始练习</button>
+      </div>
+      <div class="n1-section-tabs" id="n1-section-tabs"></div>
+      <div id="n1-quiz-box">
+        <div class="empty-tips">请选择考试日期并开始练习</div>
+      </div>
+    </div>
+
     <div id="notebook-panel" class="panel">
       <div style="text-align: center; margin-bottom: 20px;">
         <button class="primary-btn" id="start-notebook-quiz-btn" style="display:none;">🎯 针对错题本开始测试</button>
@@ -414,6 +549,13 @@
       // ===== 新增：两个题库的数据容器 + 数据源映射 =====
       let tem4Data = [];
       let kimatuData = [];
+      let n1ExamList = [];
+      let n1CurrentExam = null;
+      let n1CurrentQuestions = [];
+      let n1FilteredQuestions = [];
+      let n1CurrentIndex = 0;
+      let n1CurrentSection = 'all';
+      let n1Stats = { total: 0, correct: 0 };
 
       const dataMap = {
         tem4: () => tem4Data,
@@ -432,16 +574,19 @@
 
         try {
 
-          const [tem4Res, kimatuRes] = await Promise.all([
+          const [tem4Res, kimatuRes, n1ExamRes] = await Promise.all([
             fetch('./data/tem4.json'),
-            fetch('./data/kimatu.json')
+            fetch('./data/kimatu.json'),
+            fetch('./data/n1-exams.json')
           ]);
 
           if (!tem4Res.ok) throw new Error(`HTTP ${tem4Res.status} (tem4.json)`);
           if (!kimatuRes.ok) throw new Error(`HTTP ${kimatuRes.status} (kimatu.json)`);
+          if (!n1ExamRes.ok) throw new Error(`HTTP ${n1ExamRes.status} (n1-exams.json)`);
 
           tem4Data = await tem4Res.json();
           kimatuData = await kimatuRes.json();
+          n1ExamList = await n1ExamRes.json();
 
           grammarData = dataMap[currentStudySource]();
 
@@ -450,6 +595,7 @@
 
           renderStudyList();
           renderNotebookList();
+          renderN1ExamOptions();
           updateNotebookCount();
 
         } catch (err) {
@@ -502,6 +648,7 @@
       const studyPanel = $('#study-panel');
       const quizPanel = $('#quiz-panel');
       const notebookPanel = $('#notebook-panel');
+      const n1Panel = $('#n1-panel');
       const searchInput = $('#search-input');
       const studyList = $('#study-list');
       const notebookList = $('#notebook-list');
@@ -515,6 +662,11 @@
       const nextBtn = $('#next-btn');
       const notebookCountSpan = $('#notebook-count');
       const startNotebookQuizBtn = $('#start-notebook-quiz-btn');
+      const n1ExamSelect = $('#n1-exam-select');
+      const n1ModeSelect = $('#n1-mode-select');
+      const n1StartBtn = $('#n1-start-btn');
+      const n1SectionTabs = $('#n1-section-tabs');
+      const n1QuizBox = $('#n1-quiz-box');
       const fbConn = $('#fb-conn');
       const fbJp = $('#fb-jp');
       const fbZh = $('#fb-zh');
@@ -538,8 +690,25 @@
 
       function escapeHtml(str) {
         const div = document.createElement('div');
-        div.appendChild(document.createTextNode(str));
+        div.appendChild(document.createTextNode(str == null ? '' : String(str)));
         return div.innerHTML;
+      }
+
+      function normalizeText(str) {
+        return String(str || '').replace(/\r/g, '').trim();
+      }
+
+      function cleanQuestionHtml(str) {
+        return escapeHtml(normalizeText(str)).replace(/&lt;(\/?u)&gt;/g, '<$1>');
+      }
+
+      function hasVisibleQuestionText(str) {
+        return normalizeText(str).replace(/<br\s*\/?\s*>/gi, "").trim().length > 0;
+      }
+
+      function getAssetUrl(examMeta, relativePath) {
+        if (!relativePath || !examMeta) return '';
+        return `./data/N1/${examMeta.id}/${relativePath}`;
       }
 
       function shuffleArray(arr) {
@@ -607,6 +776,7 @@
         studyPanel.classList.remove('active');
         quizPanel.classList.remove('active');
         notebookPanel.classList.remove('active');
+        n1Panel.classList.remove('active');
 
         if (tabName === 'study') {
           studyPanel.classList.add('active');
@@ -622,6 +792,11 @@
         } else if (tabName === 'notebook') {
           notebookPanel.classList.add('active');
           renderNotebookList();
+        } else if (tabName === 'n1') {
+          n1Panel.classList.add('active');
+          if (!n1CurrentExam && n1ExamList.length > 0) {
+            startN1Practice();
+          }
         }
       }
 
@@ -810,6 +985,205 @@
         nextQuestion();
       }
 
+
+      // ==========================================
+      // N1 真题测试
+      // ==========================================
+      function renderN1ExamOptions() {
+        if (!n1ExamSelect) return;
+        n1ExamSelect.innerHTML = '';
+        n1ExamList.forEach(exam => {
+          const option = document.createElement('option');
+          option.value = exam.id;
+          option.innerText = exam.title;
+          n1ExamSelect.appendChild(option);
+        });
+      }
+
+      function collectN1Questions(node, context = {}) {
+        const list = [];
+        if (!node) return list;
+
+        const nextContext = {
+          sectionTitle: context.sectionTitle || node.title || '',
+          parentTitle: context.parentTitle || '',
+          audio: node.audio || context.audio || '',
+          image: node.image || context.image || '',
+          questionType: node.questionType || context.questionType || ''
+        };
+
+        if (Array.isArray(node.questions)) {
+          node.questions.forEach(child => {
+            const childContext = {
+              ...nextContext,
+              parentTitle: node.options ? nextContext.parentTitle : normalizeText(node.title || nextContext.parentTitle)
+            };
+            list.push(...collectN1Questions(child, childContext));
+          });
+        }
+
+        if (Array.isArray(node.options) && node.options.length > 0 && node.answer !== undefined) {
+          list.push({
+            ...node,
+            sectionTitle: context.sectionTitle || '',
+            parentTitle: context.parentTitle || '',
+            audio: node.audio || context.audio || '',
+            image: node.image || context.image || '',
+            questionType: node.questionType || context.questionType || ''
+          });
+        }
+
+        return list;
+      }
+
+      async function startN1Practice() {
+        if (!n1ExamSelect || n1ExamList.length === 0) {
+          n1QuizBox.innerHTML = '<div class="empty-tips">N1真题目录加载失败，请检查 data/n1-exams.json</div>';
+          return;
+        }
+
+        const examMeta = n1ExamList.find(exam => exam.id === n1ExamSelect.value) || n1ExamList[0];
+        n1ExamSelect.value = examMeta.id;
+        n1QuizBox.innerHTML = '<div class="empty-tips">N1真题加载中，请稍候...</div>';
+
+        try {
+          const res = await fetch(examMeta.path);
+          if (!res.ok) throw new Error(`HTTP ${res.status} (${examMeta.path})`);
+
+          const data = await res.json();
+          n1CurrentExam = { ...examMeta, data };
+          n1CurrentQuestions = [];
+          (data.sections || []).forEach(section => {
+            n1CurrentQuestions.push(...collectN1Questions(section, { sectionTitle: section.title || '' }));
+          });
+
+          n1CurrentSection = 'all';
+          n1Stats = { total: 0, correct: 0 };
+          renderN1SectionTabs();
+          resetN1QuestionPool();
+          renderN1Question();
+        } catch (err) {
+          console.error(err);
+          n1QuizBox.innerHTML = '<div class="empty-tips">N1真题加载失败，请检查文件路径或刷新页面重试</div>';
+        }
+      }
+
+      function renderN1SectionTabs() {
+        const sectionNames = [...new Set(n1CurrentQuestions.map(q => q.sectionTitle).filter(Boolean))];
+        n1SectionTabs.innerHTML = '';
+        const allBtn = createN1SectionButton('all', '全部');
+        n1SectionTabs.appendChild(allBtn);
+        sectionNames.forEach((title, index) => {
+          const btn = createN1SectionButton(title, `問題${index + 1}`);
+          btn.title = title;
+          n1SectionTabs.appendChild(btn);
+        });
+      }
+
+      function createN1SectionButton(value, label) {
+        const btn = document.createElement('button');
+        btn.className = `sub-tab-btn${value === n1CurrentSection ? ' active' : ''}`;
+        btn.innerText = label;
+        btn.addEventListener('click', function () {
+          n1CurrentSection = value;
+          $$('#n1-section-tabs .sub-tab-btn').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          resetN1QuestionPool();
+          renderN1Question();
+        });
+        return btn;
+      }
+
+      function resetN1QuestionPool() {
+        n1FilteredQuestions = n1CurrentSection === 'all'
+          ? [...n1CurrentQuestions]
+          : n1CurrentQuestions.filter(q => q.sectionTitle === n1CurrentSection);
+
+        if (n1ModeSelect.value === 'random') {
+          shuffleArray(n1FilteredQuestions);
+        }
+        n1CurrentIndex = 0;
+      }
+
+      function getN1CorrectIndex(question) {
+        const parsed = Number.parseInt(question.answer, 10);
+        return Number.isNaN(parsed) ? -1 : parsed;
+      }
+
+      function renderN1Question() {
+        if (!n1CurrentExam || n1FilteredQuestions.length === 0) {
+          n1QuizBox.innerHTML = '<div class="empty-tips">当前范围没有可练习的题目</div>';
+          return;
+        }
+
+        const question = n1FilteredQuestions[n1CurrentIndex];
+        const correctIndex = getN1CorrectIndex(question);
+        const audioUrl = getAssetUrl(n1CurrentExam, question.audio);
+        const imageUrl = getAssetUrl(n1CurrentExam, question.image);
+        const parentTitle = normalizeText(question.parentTitle);
+        const questionTitle = normalizeText(question.title);
+        const hasQuestionTitle = hasVisibleQuestionText(questionTitle);
+
+        n1QuizBox.innerHTML = `
+          <div class="n1-question-card">
+            <div class="n1-meta">
+              <span>${escapeHtml(n1CurrentExam.data.base?.title || n1CurrentExam.title)} · 第 ${n1CurrentIndex + 1} / ${n1FilteredQuestions.length} 题</span>
+              <span>正确率: ${n1Stats.correct} / ${n1Stats.total}</span>
+            </div>
+            <div class="n1-section-title">${escapeHtml(question.sectionTitle || 'N1真题')}</div>
+            ${parentTitle && parentTitle !== questionTitle ? `<div class="n1-passage">${cleanQuestionHtml(parentTitle)}</div>` : ''}
+            <div class="n1-media">
+              ${audioUrl ? `<audio controls src="${escapeHtml(audioUrl)}"></audio>` : ''}
+              ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="题目图片">` : ''}
+            </div>
+            <div class="n1-question-title ${hasQuestionTitle ? "" : "is-hidden"}">${cleanQuestionHtml(questionTitle)}</div>
+            <div class="quiz-options" id="n1-options-box">
+              ${(question.options || []).map((option, index) => `
+                <button class="option-btn" data-index="${index}">${index + 1}. ${escapeHtml(normalizeText(option))}</button>
+              `).join('')}
+            </div>
+            <div class="n1-answer" id="n1-answer-box">
+              <div class="detail-item"><span class="detail-label">答案</span> ${correctIndex + 1}. ${escapeHtml(normalizeText(question.options?.[correctIndex] || ''))}</div>
+              <div class="detail-item"><span class="detail-label">解析</span><div>${escapeHtml(normalizeText(question.explanation || '暂无解析'))}</div></div>
+            </div>
+            <div class="action-btns">
+              <button class="primary-btn" id="n1-prev-btn">上一题</button>
+              <button class="primary-btn" id="n1-next-btn">下一题</button>
+            </div>
+          </div>
+        `;
+
+        $$('#n1-options-box .option-btn').forEach(btn => {
+          btn.addEventListener('click', function () {
+            handleN1Answer(Number(this.getAttribute('data-index')), correctIndex);
+          });
+        });
+
+        $('#n1-prev-btn').addEventListener('click', function () {
+          n1CurrentIndex = (n1CurrentIndex - 1 + n1FilteredQuestions.length) % n1FilteredQuestions.length;
+          renderN1Question();
+        });
+
+        $('#n1-next-btn').addEventListener('click', function () {
+          n1CurrentIndex = (n1CurrentIndex + 1) % n1FilteredQuestions.length;
+          renderN1Question();
+        });
+      }
+
+      function handleN1Answer(selectedIndex, correctIndex) {
+        $$('#n1-options-box .option-btn').forEach(btn => {
+          const btnIndex = Number(btn.getAttribute('data-index'));
+          btn.disabled = true;
+          if (btnIndex === correctIndex) btn.classList.add('correct');
+          if (btnIndex === selectedIndex && selectedIndex !== correctIndex) btn.classList.add('wrong');
+        });
+
+        n1Stats.total++;
+        if (selectedIndex === correctIndex) n1Stats.correct++;
+        const answerBox = $('#n1-answer-box');
+        if (answerBox) answerBox.classList.add('show');
+      }
+
       // ==========================================
       // 事件绑定（所有按钮均在此处绑定，彻底解决点击无响应问题）
       // ==========================================
@@ -848,6 +1222,13 @@
       nextBtn.addEventListener('click', nextQuestion);
       quizStarBtn.addEventListener('click', toggleNotebookCurrent);
       startNotebookQuizBtn.addEventListener('click', startNotebookQuiz);
+      n1StartBtn.addEventListener('click', startN1Practice);
+      n1ExamSelect.addEventListener('change', startN1Practice);
+      n1ModeSelect.addEventListener('change', function () {
+        if (!n1CurrentExam) return;
+        resetN1QuestionPool();
+        renderN1Question();
+      });
 
       // ==========================================
       // 初始化
