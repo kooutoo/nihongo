@@ -716,14 +716,16 @@
 
       function renderQuestionHtml(str) {
         return escapeHtml(normalizeText(str))
-          .replace(/&lt;\s*(\/?)(p|u|b|strong|em)\s*&gt;/gi, '<$1$2>')
-          .replace(/&lt;\s*br\s*\/?\s*&gt;/gi, '<br>');
+          .replace(/&lt;\s*(\/?)\s*(p|u|b|strong|em)\b(?:[^&]|&(?!gt;))*&gt;/gi, function (_, slash, tag) {
+            return `<${slash}${tag.toLowerCase()}>`;
+          })
+          .replace(/&lt;\s*br\b(?:[^&]|&(?!gt;))*&gt;/gi, '<br>');
       }
 
       function hasVisibleQuestionText(str) {
         return normalizeText(str)
-          .replace(/<\/?(?:p|u|b|strong|em)>/gi, "")
-          .replace(/<br\s*\/?\s*>/gi, "")
+          .replace(/<\/?(?:p|u|b|strong|em)\b[^>]*>/gi, "")
+          .replace(/<br\b[^>]*>/gi, "")
           .trim().length > 0;
       }
 
