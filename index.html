@@ -379,7 +379,6 @@
       border-radius: 8px;
       padding: 14px;
       margin-bottom: 14px;
-      white-space: pre-wrap;
       text-align: left;
     }
 
@@ -388,7 +387,24 @@
       font-weight: bold;
       color: #1a1a1a;
       margin-bottom: 16px;
-      white-space: pre-wrap;
+    }
+
+    .n1-rich-text {
+      white-space: normal;
+      line-height: 1.8;
+      text-align: left;
+    }
+
+    .n1-rich-text p {
+      margin: 0 0 0.8em;
+    }
+
+    .n1-rich-text p:last-child {
+      margin-bottom: 0;
+    }
+
+    .n1-rich-text.jp p {
+      text-indent: 1em;
     }
 
     .n1-media {
@@ -698,12 +714,17 @@
         return String(str || '').replace(/\r/g, '').trim();
       }
 
-      function cleanQuestionHtml(str) {
-        return escapeHtml(normalizeText(str)).replace(/&lt;(\/?u)&gt;/g, '<$1>');
+      function renderQuestionHtml(str) {
+        return escapeHtml(normalizeText(str))
+          .replace(/&lt;\s*(\/?)(p|u|b|strong|em)\s*&gt;/gi, '<$1$2>')
+          .replace(/&lt;\s*br\s*\/?\s*&gt;/gi, '<br>');
       }
 
       function hasVisibleQuestionText(str) {
-        return normalizeText(str).replace(/<br\s*\/?\s*>/gi, "").trim().length > 0;
+        return normalizeText(str)
+          .replace(/<\/?(?:p|u|b|strong|em)>/gi, "")
+          .replace(/<br\s*\/?\s*>/gi, "")
+          .trim().length > 0;
       }
 
       function getAssetUrl(examMeta, relativePath) {
@@ -1131,12 +1152,12 @@
               <span>正确率: ${n1Stats.correct} / ${n1Stats.total}</span>
             </div>
             <div class="n1-section-title">${escapeHtml(question.sectionTitle || 'N1真题')}</div>
-            ${parentTitle && parentTitle !== questionTitle ? `<div class="n1-passage">${cleanQuestionHtml(parentTitle)}</div>` : ''}
+            ${parentTitle && parentTitle !== questionTitle ? `<div class="n1-passage n1-rich-text jp">${renderQuestionHtml(parentTitle)}</div>` : ''}
             <div class="n1-media">
               ${audioUrl ? `<audio controls src="${escapeHtml(audioUrl)}"></audio>` : ''}
               ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="题目图片">` : ''}
             </div>
-            <div class="n1-question-title ${hasQuestionTitle ? "" : "is-hidden"}">${cleanQuestionHtml(questionTitle)}</div>
+            <div class="n1-question-title n1-rich-text jp ${hasQuestionTitle ? "" : "is-hidden"}">${renderQuestionHtml(questionTitle)}</div>
             <div class="quiz-options" id="n1-options-box">
               ${(question.options || []).map((option, index) => `
                 <button class="option-btn" data-index="${index}">${index + 1}. ${escapeHtml(normalizeText(option))}</button>
