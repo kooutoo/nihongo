@@ -343,11 +343,108 @@
     }
 
     .n1-section-tabs {
+      margin-bottom: 18px;
+    }
+
+    .n1-question-nav {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+
+    .n1-nav-summary {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: #64748b;
+      font-size: 14px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .n1-nav-dots {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
       gap: 8px;
+    }
+
+    .n1-nav-dot {
+      position: relative;
+      width: 30px;
+      height: 30px;
+      border: 1px solid #cbd5e1;
+      border-radius: 50%;
+      background: #fff;
+      color: #475569;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+      line-height: 1;
+      transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+    }
+
+    .n1-nav-dot:hover {
+      border-color: var(--primary-color);
+      color: var(--primary-color);
+    }
+
+    .n1-nav-dot.in-progress {
+      background: #fff7ed;
+      border-color: #d9a441;
+      color: #8a5a12;
+    }
+
+    .n1-nav-dot.done {
+      background: var(--primary-light);
+      border-color: #b8d3b2;
+      color: var(--primary-color);
+    }
+
+    .n1-nav-dot.current {
+      background: var(--primary-color);
+      border-color: var(--primary-color);
+      color: #fff;
+      transform: scale(1.08);
+      box-shadow: 0 4px 10px rgba(74, 103, 65, 0.2);
+    }
+
+    .n1-nav-star {
+      position: absolute;
+      top: -7px;
+      right: -5px;
+      color: #d9a441;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .n1-current-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
       margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .n1-current-row .n1-section-title {
+      margin-bottom: 0;
+    }
+
+    .n1-favorite-btn {
+      padding: 6px 12px;
+      border: 1px solid #d9a441;
+      border-radius: 999px;
+      background: #fff;
+      color: #8a5a12;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .n1-favorite-btn.starred {
+      background: #fffbeb;
     }
 
     .n1-question-card {
@@ -571,7 +668,8 @@
       let n1FilteredQuestions = [];
       let n1CurrentIndex = 0;
       let n1CurrentSection = 'all';
-      let n1Stats = { total: 0, correct: 0 };
+      let n1AnsweredQuestions = new Set();
+      let n1FavoriteSections = new Set();
 
       const dataMap = {
         tem4: () => tem4Data,
@@ -1081,8 +1179,8 @@
           });
 
           n1CurrentSection = 'all';
-          n1Stats = { total: 0, correct: 0 };
-          renderN1SectionTabs();
+          n1AnsweredQuestions = new Set();
+          n1FavoriteSections = new Set();
           resetN1QuestionPool();
           renderN1Question();
         } catch (err) {
@@ -1091,36 +1189,93 @@
         }
       }
 
-      function renderN1SectionTabs() {
-        const sectionNames = [...new Set(n1CurrentQuestions.map(q => q.sectionTitle).filter(Boolean))];
-        n1SectionTabs.innerHTML = '';
-        const allBtn = createN1SectionButton('all', '全部');
-        n1SectionTabs.appendChild(allBtn);
-        sectionNames.forEach((title, index) => {
-          const btn = createN1SectionButton(title, `問題${index + 1}`);
-          btn.title = title;
-          n1SectionTabs.appendChild(btn);
-        });
+      function getN1SectionNames() {
+        return [...new Set(n1CurrentQuestions.map(q => q.sectionTitle || 'N1真题').filter(Boolean))];
       }
 
-      function createN1SectionButton(value, label) {
-        const btn = document.createElement('button');
-        btn.className = `sub-tab-btn${value === n1CurrentSection ? ' active' : ''}`;
-        btn.innerText = label;
-        btn.addEventListener('click', function () {
-          n1CurrentSection = value;
-          $$('#n1-section-tabs .sub-tab-btn').forEach(b => b.classList.remove('active'));
-          this.classList.add('active');
-          resetN1QuestionPool();
-          renderN1Question();
+      function getN1QuestionKey(question) {
+        const index = n1CurrentQuestions.indexOf(question);
+        return index > -1 ? String(index) : `${question.sectionTitle || ''}-${question.title || ''}`;
+      }
+
+      function getCurrentN1SectionTitle() {
+        const question = n1FilteredQuestions[n1CurrentIndex];
+        return question?.sectionTitle || 'N1真题';
+      }
+
+      function getN1SectionLabel(sectionTitle) {
+        const index = getN1SectionNames().indexOf(sectionTitle);
+        return index > -1 ? `問題${index + 1}` : '問題';
+      }
+
+      function getN1SectionQuestions(sectionTitle) {
+        return n1CurrentQuestions.filter(q => (q.sectionTitle || 'N1真题') === sectionTitle);
+      }
+
+      function getN1AnsweredCount(questions) {
+        return questions.filter(q => n1AnsweredQuestions.has(getN1QuestionKey(q))).length;
+      }
+
+      function getN1CurrentSectionIndex() {
+        const index = getN1SectionNames().indexOf(getCurrentN1SectionTitle());
+        return index > -1 ? index : 0;
+      }
+
+      function renderN1SectionTabs() {
+        const sectionNames = getN1SectionNames();
+        const currentSectionTitle = getCurrentN1SectionTitle();
+        const currentSectionIndex = getN1CurrentSectionIndex();
+        const doneSections = sectionNames.filter(sectionTitle => {
+          const questions = getN1SectionQuestions(sectionTitle);
+          return questions.length > 0 && getN1AnsweredCount(questions) === questions.length;
+        }).length;
+
+        n1SectionTabs.innerHTML = `
+          <div class="n1-question-nav">
+            <div class="n1-nav-summary">
+              <span>第${currentSectionIndex + 1}题 / 共${sectionNames.length}题</span>
+              <span>已完成 ${doneSections} / ${sectionNames.length}</span>
+            </div>
+            <div class="n1-nav-dots" aria-label="题目导航">
+              ${sectionNames.map((sectionTitle, index) => {
+                const questions = getN1SectionQuestions(sectionTitle);
+                const answered = getN1AnsweredCount(questions);
+                const isCurrent = sectionTitle === currentSectionTitle;
+                const isDone = answered > 0 && answered === questions.length;
+                const isInProgress = answered > 0 && answered < questions.length;
+                const isStarred = n1FavoriteSections.has(sectionTitle);
+                const classes = [
+                  'n1-nav-dot',
+                  isCurrent ? 'current' : '',
+                  isDone ? 'done' : '',
+                  isInProgress ? 'in-progress' : ''
+                ].filter(Boolean).join(' ');
+
+                return `
+                  <button class="${classes}" type="button" data-section-index="${index}" title="${escapeHtml(sectionTitle)}">
+                    ${index + 1}
+                    ${isStarred ? '<span class="n1-nav-star">★</span>' : ''}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+
+        $$('#n1-section-tabs .n1-nav-dot').forEach(btn => {
+          btn.addEventListener('click', function () {
+            const sectionIndex = Number(this.getAttribute('data-section-index'));
+            n1CurrentSection = sectionNames[sectionIndex] || 'all';
+            resetN1QuestionPool();
+            renderN1Question();
+          });
         });
-        return btn;
       }
 
       function resetN1QuestionPool() {
         n1FilteredQuestions = n1CurrentSection === 'all'
           ? [...n1CurrentQuestions]
-          : n1CurrentQuestions.filter(q => q.sectionTitle === n1CurrentSection);
+          : n1CurrentQuestions.filter(q => (q.sectionTitle || 'N1真题') === n1CurrentSection);
 
         if (n1ModeSelect.value === 'random') {
           shuffleArray(n1FilteredQuestions);
@@ -1146,14 +1301,24 @@
         const parentTitle = normalizeText(question.parentTitle);
         const questionTitle = normalizeText(question.title);
         const hasQuestionTitle = hasVisibleQuestionText(questionTitle);
+        const currentSectionTitle = getCurrentN1SectionTitle();
+        const currentSectionQuestions = getN1SectionQuestions(currentSectionTitle);
+        const currentSectionDone = getN1AnsweredCount(currentSectionQuestions);
+        const currentSectionLabel = getN1SectionLabel(currentSectionTitle);
+        const isCurrentSectionStarred = n1FavoriteSections.has(currentSectionTitle);
+
+        renderN1SectionTabs();
 
         n1QuizBox.innerHTML = `
           <div class="n1-question-card">
             <div class="n1-meta">
               <span>${escapeHtml(n1CurrentExam.data.base?.title || n1CurrentExam.title)} · 第 ${n1CurrentIndex + 1} / ${n1FilteredQuestions.length} 题</span>
-              <span>正确率: ${n1Stats.correct} / ${n1Stats.total}</span>
+              <span id="n1-section-progress">本题完成 ${currentSectionDone} / ${currentSectionQuestions.length}</span>
             </div>
-            <div class="n1-section-title">${escapeHtml(question.sectionTitle || 'N1真题')}</div>
+            <div class="n1-current-row">
+              <div class="n1-section-title">${escapeHtml(currentSectionLabel)} · ${escapeHtml(currentSectionTitle || 'N1真题')}</div>
+              <button class="n1-favorite-btn ${isCurrentSectionStarred ? 'starred' : ''}" id="n1-favorite-btn" type="button">${isCurrentSectionStarred ? '★ 已收藏' : '☆ 收藏'}</button>
+            </div>
             ${parentTitle && parentTitle !== questionTitle ? `<div class="n1-passage n1-rich-text jp">${renderQuestionHtml(parentTitle)}</div>` : ''}
             <div class="n1-media">
               ${audioUrl ? `<audio controls src="${escapeHtml(audioUrl)}"></audio>` : ''}
@@ -1182,6 +1347,10 @@
           });
         });
 
+        $('#n1-favorite-btn').addEventListener('click', function () {
+          toggleN1FavoriteSection(currentSectionTitle);
+        });
+
         $('#n1-prev-btn').addEventListener('click', function () {
           n1CurrentIndex = (n1CurrentIndex - 1 + n1FilteredQuestions.length) % n1FilteredQuestions.length;
           renderN1Question();
@@ -1193,7 +1362,21 @@
         });
       }
 
+      function toggleN1FavoriteSection(sectionTitle) {
+        if (n1FavoriteSections.has(sectionTitle)) {
+          n1FavoriteSections.delete(sectionTitle);
+        } else {
+          n1FavoriteSections.add(sectionTitle);
+        }
+        renderN1Question();
+      }
+
       function handleN1Answer(selectedIndex, correctIndex) {
+        const question = n1FilteredQuestions[n1CurrentIndex];
+        if (question) {
+          n1AnsweredQuestions.add(getN1QuestionKey(question));
+        }
+
         $$('#n1-options-box .option-btn').forEach(btn => {
           const btnIndex = Number(btn.getAttribute('data-index'));
           btn.disabled = true;
@@ -1201,10 +1384,14 @@
           if (btnIndex === selectedIndex && selectedIndex !== correctIndex) btn.classList.add('wrong');
         });
 
-        n1Stats.total++;
-        if (selectedIndex === correctIndex) n1Stats.correct++;
         const answerBox = $('#n1-answer-box');
         if (answerBox) answerBox.classList.add('show');
+        renderN1SectionTabs();
+        const progressText = $('#n1-section-progress');
+        if (progressText) {
+          const sectionQuestions = getN1SectionQuestions(getCurrentN1SectionTitle());
+          progressText.innerText = `本题完成 ${getN1AnsweredCount(sectionQuestions)} / ${sectionQuestions.length}`;
+        }
       }
 
       // ==========================================
