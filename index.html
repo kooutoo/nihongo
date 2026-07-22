@@ -827,9 +827,17 @@
           .trim().length > 0;
       }
 
+      const AUDIO_BASE = "https://pub-59c56cc57b954c2c9bf00d434086b8fc.r2.dev";
+
       function getAssetUrl(examMeta, relativePath) {
         if (!relativePath || !examMeta) return '';
         return `./data/N1/${examMeta.id}/${relativePath}`;
+      }
+
+      function getAudioAssetUrl(examMeta, relativePath) {
+        if (!relativePath || !examMeta) return '';
+        const filename = relativePath.replace(/^audio\//, '');
+        return `${AUDIO_BASE}/audio/N1/${examMeta.id}/${filename}`;
       }
 
       function shuffleArray(arr) {
@@ -1296,7 +1304,7 @@
 
         const question = n1FilteredQuestions[n1CurrentIndex];
         const correctIndex = getN1CorrectIndex(question);
-        const audioUrl = getAssetUrl(n1CurrentExam, question.audio);
+        const audioUrl = getAudioAssetUrl(n1CurrentExam, question.audio);
         const imageUrl = getAssetUrl(n1CurrentExam, question.image);
         const parentTitle = normalizeText(question.parentTitle);
         const questionTitle = normalizeText(question.title);
