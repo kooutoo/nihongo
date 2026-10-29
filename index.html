@@ -504,6 +504,11 @@
       text-indent: 1em;
     }
 
+    #n1-options-box u,
+    #n1-answer-box u {
+      font-weight: bold;
+    }
+
     .n1-media {
       display: grid;
       gap: 12px;
@@ -1335,11 +1340,11 @@
             <div class="n1-question-title n1-rich-text jp ${hasQuestionTitle ? "" : "is-hidden"}">${renderQuestionHtml(questionTitle)}</div>
             <div class="quiz-options" id="n1-options-box">
               ${(question.options || []).map((option, index) => `
-                <button class="option-btn" data-index="${index}">${index + 1}. ${escapeHtml(normalizeText(option))}</button>
+                <button class="option-btn" data-index="${index}">${index + 1}. ${renderQuestionHtml(option)}</button>
               `).join('')}
             </div>
             <div class="n1-answer" id="n1-answer-box">
-              <div class="detail-item"><span class="detail-label">答案</span> ${correctIndex + 1}. ${escapeHtml(normalizeText(question.options?.[correctIndex] || ''))}</div>
+              <div class="detail-item"><span class="detail-label">答案</span> ${correctIndex + 1}. ${renderQuestionHtml(question.options?.[correctIndex] || '')}</div>
               <div class="detail-item"><span class="detail-label">解析</span><div>${escapeHtml(normalizeText(question.explanation || '暂无解析'))}</div></div>
             </div>
             <div class="action-btns">
