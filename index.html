@@ -1193,7 +1193,7 @@
 
           n1CurrentSection = 'all';
           n1AnsweredQuestions = new Set();
-          n1FavoriteSections = new Set();
+          loadN1Favorites();
           resetN1QuestionPool();
           renderN1Question();
         } catch (err) {
@@ -1375,12 +1375,33 @@
         });
       }
 
+      function loadN1Favorites() {
+        n1FavoriteSections = new Set();
+        try {
+          const saved = JSON.parse(localStorage.getItem(`n1_favorites_${n1CurrentExam.id}`) || '[]');
+          if (Array.isArray(saved)) {
+            n1FavoriteSections = new Set(saved.filter(title => typeof title === 'string'));
+          }
+        } catch (err) {
+          console.warn('N1收藏读取失败', err);
+        }
+      }
+
+      function saveN1Favorites() {
+        try {
+          localStorage.setItem(`n1_favorites_${n1CurrentExam.id}`, JSON.stringify([...n1FavoriteSections]));
+        } catch (err) {
+          console.warn('N1收藏保存失败', err);
+        }
+      }
+
       function toggleN1FavoriteSection(sectionTitle) {
         if (n1FavoriteSections.has(sectionTitle)) {
           n1FavoriteSections.delete(sectionTitle);
         } else {
           n1FavoriteSections.add(sectionTitle);
         }
+        saveN1Favorites();
         renderN1Question();
       }
 
@@ -1388,6 +1409,15 @@
         const question = n1FilteredQuestions[n1CurrentIndex];
         if (question) {
           n1AnsweredQuestions.add(getN1QuestionKey(question));
+          if (selectedIndex !== correctIndex && correctIndex >= 0) {
+            n1FavoriteSections.add(getCurrentN1SectionTitle());
+            saveN1Favorites();
+            const favoriteBtn = $('#n1-favorite-btn');
+            if (favoriteBtn) {
+              favoriteBtn.classList.add('starred');
+              favoriteBtn.innerText = '★ 已收藏';
+            }
+          }
         }
 
         $$('#n1-options-box .option-btn').forEach(btn => {
